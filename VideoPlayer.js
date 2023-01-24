@@ -1329,7 +1329,7 @@ export default class VideoPlayer extends Component {
             onEnd={this.events.onEnd}
             onSeek={this.events.onSeek}
             style={[styles.player.video, this.styles.videoStyle]}
-            source={this.props.source}
+            source={this.state.source}
           />
           {this.renderError()}
           {this.renderLoader()}
