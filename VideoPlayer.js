@@ -12,6 +12,7 @@ import {
   Image,
   View,
   Text,
+  Platform,
 } from 'react-native';
 import padStart from 'lodash/padStart';
 
@@ -33,10 +34,17 @@ export default class VideoPlayer extends Component {
     rate: 1,
     showTimeRemaining: true,
     showHours: false,
+    videoSources: [],
+    videoResolution: '480p',
   };
 
   constructor(props) {
     super(props);
+
+    const videoSource =
+      this.props.videoSources.find(
+        (vs) => vs.videoResolution === this.props.videoResolution,
+      ) ?? this.props.videoSources[0];
 
     /**
      * All of our values that are updated by the
@@ -49,6 +57,11 @@ export default class VideoPlayer extends Component {
       muted: this.props.muted,
       volume: this.props.volume,
       rate: this.props.rate,
+      resetRate: false,
+      videoResolution:
+        this.props.videoResolution ||
+        this.props.videoSources[0]?.videoResolution,
+      changingVideoResolution: false,
       // Controls
 
       isFullscreen:
@@ -70,6 +83,7 @@ export default class VideoPlayer extends Component {
       currentTime: 0,
       error: false,
       duration: 0,
+      source: {uri: videoSource?.uri},
     };
 
     /**
@@ -110,6 +124,7 @@ export default class VideoPlayer extends Component {
       togglePlayPause: this._togglePlayPause.bind(this),
       toggleControls: this._toggleControls.bind(this),
       toggleTimer: this._toggleTimer.bind(this),
+      toggleVideoResolution: this._toggleVideoResolution.bind(this),
     };
 
     /**
@@ -161,13 +176,17 @@ export default class VideoPlayer extends Component {
     };
   }
 
-  componentDidUpdate = prevProps => {
-    const {isFullscreen} = this.props;
+  componentDidUpdate = (prevProps) => {
+    const {isFullscreen, videoResolution} = this.props;
 
     if (prevProps.isFullscreen !== isFullscreen) {
       this.setState({
         isFullscreen,
       });
+    }
+
+    if (prevProps.videoResolution !== videoResolution) {
+      this.setState({videoResolution});
     }
   };
   /**
@@ -206,12 +225,22 @@ export default class VideoPlayer extends Component {
   _onLoad(data = {}) {
     let state = this.state;
 
+    //Android MediaPlayer fix for rate bug after source change
+    if (this.state.resetRate) {
+      state.resetRate = false;
+    }
+
+    if (state.changingVideoResolution) {
+      console.log('restorePreviousTime', state.currentTime);
+      this.seekTo(state.currentTime);
+    }
+
     state.duration = data.duration;
     state.loading = false;
     this.setState(state);
 
     if (state.showControls) {
-      this.setControlTimeout();
+      this.resetControlTimeout();
     }
 
     if (typeof this.props.onLoad === 'function') {
@@ -227,6 +256,12 @@ export default class VideoPlayer extends Component {
    */
   _onProgress(data = {}) {
     let state = this.state;
+
+    if (state.changingVideoResolution && data.currentTime === 0) {
+      this.setState({changingVideoResolution: false});
+      return;
+    }
+
     if (!state.scrubbing) {
       state.currentTime = data.currentTime;
 
@@ -526,6 +561,31 @@ export default class VideoPlayer extends Component {
     this.setState(state);
   }
 
+  _toggleVideoResolution() {
+    const {videoSources} = this.props;
+    const indexOfCurrentResolution = videoSources.findIndex(
+      (vs) => vs.videoResolution === this.state.videoResolution,
+    );
+    if (this.state.loading || indexOfCurrentResolution < 0) return;
+
+    const nextIndex = (indexOfCurrentResolution + 1) % videoSources.length;
+    const {videoResolution, uri} = videoSources[nextIndex];
+
+    // console.log('toggleVideoRes new uri', uri.split('mp4')[0]);
+    // console.log('toggleVideoRes prev uri', this.state.source.uri.split('mp4')[0]);
+    // console.log('toggleVideRes source', {uri});
+
+    let state = this.state;
+    state.videoResolution = videoResolution;
+    state.source = {uri};
+    state.changingVideoResolution = true;
+    this.setState(state);
+
+    if (typeof this.events.onVideoResolutionChange === 'function') {
+      this.events.onVideoResolutionChange(videoResolution);
+    }
+  }
+
   /**
    * The default 'onBack' function pops the navigator
    * and as such the video player requires a
@@ -740,19 +800,42 @@ export default class VideoPlayer extends Component {
    * we have to handle possible props changes to state changes
    */
   UNSAFE_componentWillReceiveProps(nextProps) {
-    if (this.state.paused !== nextProps.paused) {
-      this.setState({
-        paused: nextProps.paused,
-      });
+    const {videoSources, paused, videoStyle, style, rate, videoResolution} =
+      nextProps;
+    let state = this.state;
+
+    state.paused = paused;
+    state.rate = rate;
+
+    if (state.videoSources !== videoSources) {
+      if (!state.loading) {
+        console.log('loading new sources');
+        const {uri, videoResolution} =
+          videoSources.find(
+            (vs) => vs.videoResolution === state.videoResolution,
+          ) ?? {};
+        if (!uri || !videoResolution) {
+          state.source = {uri: videoSources[0].uri};
+          state.videoResolution = videoSources[0].videoResolution;
+        } else {
+          state.source = {uri};
+          state.videoResolution = videoResolution;
+        }
+        state.videoSources = videoSources;
+
+        //Android MediaPlayer fix for rate bug after source change
+        if (Platform.OS === 'android') {
+          state.resetRate = true;
+        }
+      } else {
+        console.log('not changing source because is loading');
+      }
     }
 
-    if (this.styles.videoStyle !== nextProps.videoStyle) {
-      this.styles.videoStyle = nextProps.videoStyle;
-    }
+    this.styles.videoStyle = videoStyle;
+    this.styles.containerStyle = style;
 
-    if (this.styles.containerStyle !== nextProps.style) {
-      this.styles.containerStyle = nextProps.style;
-    }
+    this.setState(state);
   }
 
   /**
@@ -922,10 +1005,11 @@ export default class VideoPlayer extends Component {
    * consistent <TouchableHighlight>
    * wrapper and styling.
    */
-  renderControl(children, callback, style = {}) {
+  renderControl(children, callback, style = {}, disabled = false) {
     return (
       <TouchableHighlight
         underlayColor="transparent"
+        disabled={disabled}
         activeOpacity={0.3}
         onPress={() => {
           this.resetControlTimeout();
@@ -944,6 +1028,17 @@ export default class VideoPlayer extends Component {
     return <View style={[styles.controls.control]} />;
   }
 
+  renderVideoResolution() {
+    return this.renderControl(
+      <Text style={styles.controls.videoResolutionText}>
+        {this.state.videoResolution}
+      </Text>,
+      this.methods.toggleVideoResolution,
+      styles.controls.videoResolution,
+      this.state.loading,
+    );
+  }
+
   /**
    * Groups the top bar controls together in an animated
    * view and spaces them out.
@@ -952,12 +1047,18 @@ export default class VideoPlayer extends Component {
     const backControl = this.props.disableBack
       ? this.renderNullControl()
       : this.renderBack();
-    const volumeControl = this.props.disableVolume
-      ? this.renderNullControl()
-      : this.renderVolume();
-    const fullscreenControl = this.props.disableFullscreen
-      ? this.renderNullControl()
-      : this.renderFullscreen();
+    const qualityControl =
+      this.props.videoSources?.length > 0
+        ? this.renderVideoResolution()
+        : this.renderNullControl();
+
+    // Volume and Full screen control not required
+    // const volumeControl = this.props.disableVolume
+    //   ? this.renderNullControl()
+    //   : this.renderVolume();
+    // const fullscreenControl = this.props.disableFullscreen
+    //   ? this.renderNullControl()
+    //   : this.renderFullscreen();
 
     return (
       <Animated.View
@@ -974,10 +1075,7 @@ export default class VideoPlayer extends Component {
           imageStyle={[styles.controls.vignette]}>
           <SafeAreaView style={styles.controls.topControlGroup}>
             {backControl}
-            <View style={styles.controls.pullRight}>
-              {volumeControl}
-              {fullscreenControl}
-            </View>
+            <View style={styles.controls.pullRight}>{qualityControl}</View>
           </SafeAreaView>
         </ImageBackground>
       </Animated.View>
@@ -1087,7 +1185,7 @@ export default class VideoPlayer extends Component {
         {...this.player.seekPanResponder.panHandlers}>
         <View
           style={styles.seekbar.track}
-          onLayout={event =>
+          onLayout={(event) =>
             (this.player.seekerWidth = event.nativeEvent.layout.width)
           }
           pointerEvents={'none'}>
@@ -1217,12 +1315,13 @@ export default class VideoPlayer extends Component {
         <View style={[styles.player.container, this.styles.containerStyle]}>
           <Video
             {...this.props}
-            ref={videoPlayer => (this.player.ref = videoPlayer)}
+            ref={(videoPlayer) => (this.player.ref = videoPlayer)}
             resizeMode={this.state.resizeMode}
             volume={this.state.volume}
             paused={this.state.paused}
             muted={this.state.muted}
-            rate={this.state.rate}
+            // rate={this.state.rate}
+            rate={this.state.resetRate ? 1 : this.state.rate}
             onLoadStart={this.events.onLoadStart}
             onProgress={this.events.onProgress}
             onError={this.events.onError}
@@ -1382,6 +1481,15 @@ const styles = {
       color: '#FFF',
       fontSize: 11,
       textAlign: 'right',
+    },
+    videoResolution: {
+      width: 77,
+    },
+    videoResolutionText: {
+      textAlign: 'center',
+      backgroundColor: 'transparent',
+      color: '#FFF',
+      fontSize: 15,
     },
   }),
   volume: StyleSheet.create({
