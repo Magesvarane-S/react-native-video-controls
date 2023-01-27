@@ -36,7 +36,11 @@ export default class VideoPlayer extends Component {
     showHours: false,
     videoSources: [],
     videoResolution: '480p',
+    enableFavourite: false,
+    favourite: false,
   };
+
+  // Enable Favourite to display to fav icon next to playPause Button, do send addFavourite, removeFavourite function via props.
 
   constructor(props) {
     super(props);
@@ -62,6 +66,7 @@ export default class VideoPlayer extends Component {
         this.props.videoResolution ||
         this.props.videoSources[0]?.videoResolution,
       changingVideoResolution: false,
+      favourite: this.props.favourite,
       // Controls
 
       isFullscreen:
@@ -114,6 +119,8 @@ export default class VideoPlayer extends Component {
       onLoad: this._onLoad.bind(this),
       onPause: this.props.onPause,
       onPlay: this.props.onPlay,
+      addFavourite: this.props.addFavourite,
+      removeFavourite: this.props.removeFavourite,
     };
 
     /**
@@ -125,6 +132,7 @@ export default class VideoPlayer extends Component {
       toggleControls: this._toggleControls.bind(this),
       toggleTimer: this._toggleTimer.bind(this),
       toggleVideoResolution: this._toggleVideoResolution.bind(this),
+      toggleFavourite: this._toggleFavourite.bind(this),
     };
 
     /**
@@ -548,6 +556,19 @@ export default class VideoPlayer extends Component {
       typeof this.events.onPlay === 'function' && this.events.onPlay();
     }
 
+    this.setState(state);
+  }
+
+  _toggleFavourite() {
+    let state = this.state;
+    state.favourite = !state.favourite;
+    if (state.favourite) {
+      typeof this.events.addFavourite === 'function' &&
+        this.events.addFavourite();
+    } else {
+      typeof this.events.removeFavourite === 'function' &&
+        this.events.removeFavourite();
+    }
     this.setState(state);
   }
 
@@ -1145,9 +1166,6 @@ export default class VideoPlayer extends Component {
     const seekbarControl = this.props.disableSeekbar
       ? this.renderNullControl()
       : this.renderSeekbar();
-    const playPauseControl = this.props.disablePlayPause
-      ? this.renderNullControl()
-      : this.renderPlayPause();
 
     return (
       <Animated.View
@@ -1165,7 +1183,7 @@ export default class VideoPlayer extends Component {
           {seekbarControl}
           <SafeAreaView
             style={[styles.controls.row, styles.controls.bottomControlGroup]}>
-            {playPauseControl}
+            {this.renderBottomLeftGroupControls()}
             {this.renderTitle()}
             {timerControl}
           </SafeAreaView>
@@ -1215,6 +1233,21 @@ export default class VideoPlayer extends Component {
     );
   }
 
+  renderBottomLeftGroupControls() {
+    const playPauseControl = this.props.disablePlayPause
+      ? this.renderNullControl()
+      : this.renderPlayPause();
+    const favouriteControl = this.props.enableFavourite
+      ? this.renderFavourite()
+      : this.renderNullControl();
+    return (
+      <View style={styles.controls.bottomLeftGroup}>
+        {playPauseControl}
+        {favouriteControl}
+      </View>
+    );
+  }
+
   /**
    * Render the play/pause button and show the respective icon
    */
@@ -1227,6 +1260,17 @@ export default class VideoPlayer extends Component {
       <Image source={source} />,
       this.methods.togglePlayPause,
       styles.controls.playPause,
+    );
+  }
+
+  renderFavourite() {
+    let source =
+      this.state.favourite === true
+        ? require('./assets/img/heart.png')
+        : require('./assets/img/heart-outline.png');
+    return this.renderControl(
+      <Image style={styles.controls.favIcon} source={source} />,
+      this.methods.toggleFavourite,
     );
   }
 
@@ -1459,10 +1503,18 @@ const styles = {
     fullscreen: {
       flexDirection: 'row',
     },
+    bottomLeftGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
     playPause: {
       position: 'relative',
-      width: 80,
+      width: 35,
       zIndex: 0,
+    },
+    favIcon: {
+      width: 18,
+      height: 18,
     },
     title: {
       alignItems: 'center',
