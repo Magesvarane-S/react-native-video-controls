@@ -1264,10 +1264,9 @@ export default class VideoPlayer extends Component {
   }
 
   renderFavourite() {
-    let source =
-      this.state.favourite === true
-        ? require('./assets/img/heart.png')
-        : require('./assets/img/heart-outline.png');
+    let source = this.state.favourite
+      ? require('./assets/img/heart.png')
+      : require('./assets/img/heart-outline.png');
     return this.renderControl(
       <Image style={styles.controls.favIcon} source={source} />,
       this.methods.toggleFavourite,
