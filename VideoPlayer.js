@@ -35,9 +35,10 @@ export default class VideoPlayer extends Component {
     showTimeRemaining: true,
     showHours: false,
     videoSources: [],
-    videoResolution: '480p',
+    videoResolution: 'Original', // Select the initial video quality.
     enableFavourite: false,
     favourite: false,
+    enableVideoChangeResolution: false,
   };
 
   // Enable Favourite to display to fav icon next to playPause Button, do send addFavourite, removeFavourite function via props.
@@ -1069,7 +1070,8 @@ export default class VideoPlayer extends Component {
       ? this.renderNullControl()
       : this.renderBack();
     const qualityControl =
-      this.props.videoSources?.length > 0
+      this.props.videoSources?.length > 0 &&
+      this.props.enableVideoChangeResolution
         ? this.renderVideoResolution()
         : this.renderNullControl();
 
@@ -1534,7 +1536,7 @@ const styles = {
       textAlign: 'right',
     },
     videoResolution: {
-      width: 77,
+      width: 100,
     },
     videoResolutionText: {
       textAlign: 'center',
