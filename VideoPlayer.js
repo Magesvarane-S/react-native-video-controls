@@ -16,6 +16,8 @@ import {
 } from 'react-native';
 import padStart from 'lodash/padStart';
 
+import {s, ms, vs} from './responsive';
+
 export default class VideoPlayer extends Component {
   static defaultProps = {
     toggleResizeModeOnFullscreen: true,
@@ -1254,12 +1256,18 @@ export default class VideoPlayer extends Component {
    * Render the play/pause button and show the respective icon
    */
   renderPlayPause() {
-    let source =
-      this.state.paused === true
-        ? require('./assets/img/play.png')
-        : require('./assets/img/pause.png');
     return this.renderControl(
-      <Image source={source} />,
+      this.state.paused === true ? (
+        <Image
+          style={styles.controls.playIcon}
+          source={require('./assets/img/play.png')}
+        />
+      ) : (
+        <Image
+          style={styles.controls.pauseIcon}
+          source={require('./assets/img/pause.png')}
+        />
+      ),
       this.methods.togglePlayPause,
       styles.controls.playPause,
     );
@@ -1282,9 +1290,7 @@ export default class VideoPlayer extends Component {
     if (this.opts.title) {
       return (
         <View style={[styles.controls.control, styles.controls.title]}>
-          <Text
-            style={[styles.controls.text, styles.controls.titleText]}
-            numberOfLines={1}>
+          <Text style={styles.controls.text} numberOfLines={1}>
             {this.opts.title || ''}
           </Text>
         </View>
@@ -1465,6 +1471,7 @@ const styles = {
       color: '#FFF',
       fontSize: 14,
       textAlign: 'center',
+      fontSize: ms(13, 0.7),
     },
     pullRight: {
       flexDirection: 'row',
@@ -1510,12 +1517,20 @@ const styles = {
     },
     playPause: {
       position: 'relative',
-      width: 35,
+      width: ms(30, 1),
       zIndex: 0,
     },
+    playIcon: {
+      height: ms(12),
+      width: ms(10, 0.3),
+    },
+    pauseIcon: {
+      height: s(11),
+      width: s(11),
+    },
     favIcon: {
-      width: 18,
-      height: 18,
+      width: ms(18, 0.8),
+      height: ms(18, 0.8),
     },
     title: {
       alignItems: 'center',
@@ -1523,16 +1538,13 @@ const styles = {
       flexDirection: 'column',
       padding: 0,
     },
-    titleText: {
-      textAlign: 'center',
-    },
     timer: {
-      width: 80,
+      // width: s(80),
     },
     timerText: {
       backgroundColor: 'transparent',
       color: '#FFF',
-      fontSize: 11,
+      fontSize: ms(11),
       textAlign: 'right',
     },
     videoResolution: {
@@ -1543,6 +1555,10 @@ const styles = {
       backgroundColor: 'transparent',
       color: '#FFF',
       fontSize: 15,
+    },
+    back: {
+      height: ms(15),
+      width: ms(9),
     },
   }),
   volume: StyleSheet.create({
@@ -1577,35 +1593,35 @@ const styles = {
   seekbar: StyleSheet.create({
     container: {
       alignSelf: 'stretch',
-      height: 28,
+      height: vs(28),
       marginLeft: 20,
       marginRight: 20,
     },
     track: {
       backgroundColor: '#333',
-      height: 1,
+      height: vs(1),
       position: 'relative',
-      top: 14,
+      top: s(14),
       width: '100%',
     },
     fill: {
       backgroundColor: '#FFF',
-      height: 1,
+      height: vs(1),
       width: '100%',
     },
     handle: {
       position: 'absolute',
-      marginLeft: -7,
-      height: 28,
-      width: 28,
+      marginLeft: s(-7),
+      height: s(28),
+      width: s(28),
     },
     circle: {
-      borderRadius: 12,
+      borderRadius: s(12),
       position: 'relative',
-      top: 8,
-      left: 8,
-      height: 12,
-      width: 12,
+      top: s(8),
+      left: s(8),
+      height: s(12),
+      width: s(12),
     },
   }),
 };
